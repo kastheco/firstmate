@@ -79,7 +79,7 @@ test_capture_reads_terminal_tail_json() {
   local out
   orca_case capture-tail
   printf '{"result":{"terminal":{"tail":["line one","line two"]}}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_capture term-123 40' "$ROOT" )
   [ "$out" = $'line one\nline two' ] || fail "capture should print result.terminal.tail joined by newlines, got '$out'"
   assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''read'$'\x1f''--terminal'$'\x1f''term-123'$'\x1f''--limit'$'\x1f''40'$'\x1f''--json' \
@@ -91,7 +91,7 @@ test_capture_falls_back_to_text_fields() {
   local out
   orca_case capture-text
   printf '{"result":{"text":"plain text output"}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_capture term-abc 5' "$ROOT" )
   [ "$out" = "plain text output" ] || fail "capture should fall back to result.text, got '$out'"
   pass "fm_backend_orca_capture: falls back to result text fields"
@@ -101,7 +101,7 @@ test_capture_fails_on_orca_error_json() {
   local out status
   orca_case capture-error-json
   printf '{"ok":false,"error":{"code":"terminal_handle_stale","message":"terminal handle stale"}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_capture term-stale 5' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "capture should fail on Orca ok:false read JSON"
@@ -113,7 +113,7 @@ test_runtime_check_accepts_ready_orca_status() {
   local out
   orca_case runtime-ready
   printf '{"ok":true,"result":{"runtime":{"reachable":true,"state":"ready"}}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" FM_ORCA_STATUS_RESPONSE=sequence \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" FM_ORCA_STATUS_RESPONSE=sequence \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_runtime_check' "$ROOT" )
   [ -z "$out" ] || fail "runtime_check should be quiet on ready status, got '$out'"
   assert_contains "$(cat "$LOG")" $'orca\x1f''status'$'\x1f''--json' \
@@ -125,7 +125,7 @@ test_runtime_check_refuses_unready_orca_status() {
   local out status
   orca_case runtime-unready
   printf '{"ok":true,"result":{"runtime":{"reachable":false,"state":"starting"}}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" FM_ORCA_STATUS_RESPONSE=sequence \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" FM_ORCA_STATUS_RESPONSE=sequence \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_runtime_check' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "runtime_check should fail when Orca runtime is not ready"
@@ -139,7 +139,7 @@ test_send_text_submit_verifies_empty_composer_after_enter() {
   printf '{"ok":true,"result":{"send":{"handle":"term-123","accepted":true}}}\n' > "$RESP/1.out"
   printf '{"ok":true,"result":{"send":{"handle":"term-123","accepted":true}}}\n' > "$RESP/2.out"
   printf '{"ok":true,"result":{"terminal":{"tail":["╭───╮","│ > │","╰───╯"]}}}\n' > "$RESP/3.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_send_text_submit term-123 "hello captain" 3 0.01 0.01' "$ROOT" )
   [ "$out" = empty ] || fail "send_text_submit should report empty on successful Orca send, got '$out'"
   assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''send'$'\x1f''--terminal'$'\x1f''term-123'$'\x1f''--text'$'\x1f''hello captain'$'\x1f''--json' \
@@ -165,7 +165,7 @@ test_send_text_submit_borderless_claude_confirms() {
   printf '{"ok":true,"result":{"send":{"handle":"term-123","accepted":true}}}\n' > "$RESP/1.out"
   printf '{"ok":true,"result":{"send":{"handle":"term-123","accepted":true}}}\n' > "$RESP/2.out"
   printf '{"ok":true,"result":{"terminal":{"tail":["────────────────","❯","────────────────"]}}}\n' > "$RESP/3.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_send_text_submit term-123 "hello captain" 3 0.01 0.01' "$ROOT" )
   [ "$out" = empty ] || fail "a borderless claude composer should confirm the submit, got '$out'"
   pass "fm_backend_orca_send_text_submit: a borderless claude composer confirms delivery (the missing #2029 shape)"
@@ -181,7 +181,7 @@ test_composer_state_stale_banner_never_wins() {
   local out
   orca_case composer-stale-banner
   printf '{"ok":true,"result":{"terminal":{"tail":["╭────────────────────────╮","│ permissions: YOLO mode │","╰────────────────────────╯","› Use /skills to list available skills"]}}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_composer_state term-123' "$ROOT" )
   [ "$out" != pending ] || fail "a stale startup banner must never classify as pending composer text"
   [ "$out" = unknown ] || fail "the plain-capture codex hint should defer as unknown, got '$out'"
@@ -196,7 +196,7 @@ test_send_text_submit_retries_when_composer_stays_pending() {
   printf '{"ok":true,"result":{"terminal":{"tail":["╭─────────────────╮","│ > hello captain │","╰─────────────────╯"]}}}\n' > "$RESP/3.out"
   printf '{"ok":true,"result":{"send":{"handle":"term-123","accepted":true}}}\n' > "$RESP/4.out"
   printf '{"ok":true,"result":{"terminal":{"tail":["╭─────────────────╮","│ >               │","╰─────────────────╯"]}}}\n' > "$RESP/5.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_send_text_submit term-123 "hello captain" 3 0.01 0.01' "$ROOT" )
   [ "$out" = empty ] || fail "send_text_submit should retry Enter until the composer clears, got '$out'"
   log_text=$(cat "$LOG")
@@ -209,7 +209,7 @@ test_composer_state_popup_placeholder_fill_is_pending() {
   local out
   orca_case composer-popup-placeholder
   printf '{"ok":true,"result":{"terminal":{"tail":["  ╭──────────────────────────────────────╮","  │ ❯ /compact compaction instructions   │","  ╰──────────────── Composer ────────────╯","","  Enter:send"]}}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_composer_state term-123' "$ROOT" )
   [ "$out" = pending ] || fail "a popup-close-with-placeholder-fill must still read as pending (not yet submitted), got '$out'"
   pass "fm_backend_orca_composer_state: a slash-command popup's argument-hint placeholder still reads pending"
@@ -223,7 +223,7 @@ test_composer_state_bare_shell_prompt_is_unknown() {
   local out
   orca_case composer-bare-shell
   printf '{"ok":true,"result":{"terminal":{"tail":["some earlier output","kunchen@mac firstmate $ "]}}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_composer_state term-123' "$ROOT" )
   [ "$out" = unknown ] || fail "a bare dead-shell prompt (no bordered composer row) must read unknown, got '$out'"
   pass "fm_backend_orca_composer_state: a bare dead-shell prompt reads unknown (unsafe-for-injection), never empty"
@@ -242,7 +242,7 @@ test_send_text_submit_popup_autocomplete_requires_second_enter() {
   # 5: read - composer is empty
   printf '{"ok":true,"result":{"send":{"handle":"term-123","accepted":true}}}\n' > "$RESP/4.out"
   printf '{"ok":true,"result":{"terminal":{"tail":["  ╭────────────────────────╮","  │ ❯                      │","  ╰──────── Composer ──────╯","","  Shift+Tab:mode"]}}}\n' > "$RESP/5.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_send_text_submit term-123 "/compact" 3 0.01 1.2' "$ROOT" )
   [ "$out" = empty ] || fail "send_text_submit should eventually report empty once the SECOND Enter actually clears the composer, got '$out'"
   log_text=$(cat "$LOG")
@@ -253,7 +253,7 @@ test_send_text_submit_popup_autocomplete_requires_second_enter() {
 
 test_send_literal_constructs_non_enter_send() {
   orca_case send-literal
-  PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_send_literal term-123 "typed only"' "$ROOT"
   expect_code 0 $? "send_literal should succeed"
   assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''send'$'\x1f''--terminal'$'\x1f''term-123'$'\x1f''--text'$'\x1f''typed only'$'\x1f''--json' \
@@ -266,7 +266,7 @@ test_send_text_submit_reports_send_failed() {
   local out
   orca_case send-fail
   printf '1\n' > "$RESP/1.exit"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_send_text_submit term-123 "hello" 1 0.01 0.01' "$ROOT" )
   [ "$out" = send-failed ] || fail "failed Orca send should report send-failed, got '$out'"
   pass "fm_backend_orca_send_text_submit: reports send-failed when Orca send fails"
@@ -276,23 +276,23 @@ test_send_helpers_reject_orca_error_json() {
   local out status
   orca_case send-error-json
   printf '{"ok":false,"error":{"code":"terminal_handle_stale","message":"terminal handle stale"}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_send_text_line term-stale "hello"' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "send_text_line should fail on Orca ok:false JSON"
   assert_contains "$out" "terminal handle stale" "send_text_line should surface the Orca send error"
   printf '{"ok":false,"error":{"code":"terminal_handle_stale","message":"terminal handle stale"}}\n' > "$RESP/2.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_send_literal term-stale "typed"' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "send_literal should fail on Orca ok:false JSON"
   printf '{"ok":false,"error":{"code":"terminal_handle_stale","message":"terminal handle stale"}}\n' > "$RESP/3.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_send_key term-stale Enter' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "send_key should fail on Orca ok:false JSON"
   printf '{"ok":false,"error":{"code":"terminal_handle_stale","message":"terminal handle stale"}}\n' > "$RESP/4.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_send_text_submit term-stale "hello" 1 0.01 0.01' "$ROOT" 2>/dev/null )
   [ "$out" = send-failed ] || fail "send_text_submit should report send-failed on Orca ok:false JSON, got '$out'"
   pass "Orca send helpers: fail closed on ok:false JSON"
@@ -300,7 +300,7 @@ test_send_helpers_reject_orca_error_json() {
 
 test_send_key_enter_and_interrupt() {
   orca_case send-key
-  PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_send_key term-123 Enter; fm_backend_orca_send_key term-123 C-c' "$ROOT"
   expect_code 0 $? "send_key Enter and C-c should succeed"
   assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''send'$'\x1f''--terminal'$'\x1f''term-123'$'\x1f''--text'$'\x1f\x1f''--enter'$'\x1f''--json' \
@@ -313,7 +313,7 @@ test_send_key_enter_and_interrupt() {
 test_send_key_refuses_unknown_key() {
   local out status
   orca_case send-key-unknown
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_send_key term-123 F12' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "send_key should refuse unsupported Orca keys"
@@ -324,7 +324,7 @@ test_send_key_refuses_unknown_key() {
 test_send_key_refuses_escape_until_supported() {
   local out status
   orca_case send-key-escape
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_send_key term-123 Escape' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "send_key should refuse Escape until Orca exposes a real Escape primitive"
@@ -336,7 +336,7 @@ test_send_key_refuses_escape_until_supported() {
 test_kill_is_best_effort_close() {
   orca_case kill
   printf '1\n' > "$RESP/1.exit"
-  PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_kill term-123' "$ROOT"
   expect_code 0 $? "kill should stay best-effort when Orca close fails"
   assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''close'$'\x1f''--terminal'$'\x1f''term-123'$'\x1f''--json' \
@@ -347,7 +347,7 @@ test_kill_is_best_effort_close() {
 test_remove_worktree_refuses_empty_id() {
   local out status
   orca_case remove-empty
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_remove_worktree ""' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "remove_worktree should fail when the Orca worktree id is empty"
@@ -360,7 +360,7 @@ test_remove_worktree_rejects_orca_error_json() {
   local out status
   orca_case remove-error-json
   printf '{"ok":false,"error":{"code":"worktree_not_found","message":"worktree not found"}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_remove_worktree wt-gone' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "remove_worktree should fail on Orca ok:false JSON"
@@ -372,7 +372,7 @@ test_worktree_path_resolves_id() {
   local out
   orca_case path-resolve
   printf '{"ok":true,"result":{"worktree":{"id":"wt-123","path":"/tmp/orca-wt"}}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_worktree_path wt-123' "$ROOT" )
   [ "$out" = /tmp/orca-wt ] || fail "worktree path helper should print the resolved path, got '$out'"
   assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''show'$'\x1f''--worktree'$'\x1f''id:wt-123'$'\x1f''--json' \
@@ -394,7 +394,7 @@ test_json_get_ignores_undocumented_terminal_id_shapes() {
   printf '1\n' > "$RESP/1.exit"
   printf '{"ok":true,"result":{"repo":{"id":"repo-123"}}}\n' > "$RESP/2.out"
   printf '{"ok":true,"result":{"worktree":{"id":"wt-123","path":"/tmp/orca-wt","terminal":{"handle":"term-nested"}}}}\n' > "$RESP/3.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" FM_CONFIG_OVERRIDE="$CASE_DIR/config" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_worktree_create /repo/path fm-task' "$ROOT" )
   wt_id=${out%%$'\t'*}
   wt_path=${out#*$'\t'}
@@ -413,13 +413,13 @@ test_worktree_and_terminal_helpers_parse_json() {
   printf '{"ok":true,"result":{"repo":{"id":"repo-123"}}}\n' > "$RESP/2.out"
   printf '{"ok":true,"result":{"worktree":{"id":"wt-123","path":"/tmp/orca-wt"}}}\n' > "$RESP/3.out"
   printf '{"ok":true,"result":{"terminal":{"handle":"term-123"}}}\n' > "$RESP/4.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" FM_CONFIG_OVERRIDE="$CASE_DIR/config" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_worktree_create /repo/path fm-task' "$ROOT" )
   wt_id=${out%%$'\t'*}
   wt_path=${out#*$'\t'}
   [ "$wt_id" = wt-123 ] || fail "worktree helper should print worktree id, got '$wt_id'"
   [ "$wt_path" = /tmp/orca-wt ] || fail "worktree helper should print worktree path, got '$wt_path'"
-  term=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  term=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_terminal_create wt-123 fm-task' "$ROOT" )
   [ "$term" = term-123 ] || fail "terminal helper should print terminal handle, got '$term'"
   assert_contains "$(cat "$LOG")" $'orca\x1f''repo'$'\x1f''show'$'\x1f''--repo'$'\x1f''path:/repo/path'$'\x1f''--json' \
@@ -439,7 +439,7 @@ test_worktree_create_removes_worktree_when_path_missing() {
   printf '1\n' > "$RESP/1.exit"
   printf '{"ok":true,"result":{"repo":{"id":"repo-no-path"}}}\n' > "$RESP/2.out"
   printf '{"ok":true,"result":{"worktree":{"id":"wt-no-path"},"terminal":{"handle":"term-no-path"}}}\n' > "$RESP/3.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" FM_CONFIG_OVERRIDE="$CASE_DIR/config" \
     bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_worktree_create /repo/path fm-task' "$ROOT" 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "worktree helper should fail when Orca omits the worktree path"
@@ -469,7 +469,7 @@ test_spawn_preserves_orca_metadata_when_pathless_worktree_cleanup_fails() {
   printf '{"ok":true,"result":{"worktree":{"id":"wt-pathless-cleanup"}}}\n' > "$RESP/3.out"
   printf '{"ok":false,"error":{"code":"worktree_not_removed","message":"worktree not removed"}}\n' > "$RESP/4.out"
   printf '{"ok":false,"error":{"code":"worktree_not_removed","message":"worktree not removed"}}\n' > "$RESP/5.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/fm-spawn.sh" "$id" "$proj" claude --mode no-mistakes --yolo off --backend orca 2>&1 )
@@ -504,7 +504,7 @@ test_spawn_writes_orca_metadata_and_launches_harness() {
   printf '1\n' > "$RESP/1.exit"
   printf '{"ok":true,"result":{"repo":{"id":"repo-spawn"}}}\n' > "$RESP/2.out"
   printf '{"ok":true,"result":{"worktree":{"id":"wt-spawn","path":"%s"},"terminal":{"handle":"term-spawn"}}}\n' "$wt" > "$RESP/3.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/fm-spawn.sh" "$id" "$proj" claude --mode no-mistakes --yolo off --backend orca 2>&1 )
@@ -566,7 +566,7 @@ test_spawn_refuses_orca_when_runtime_not_ready() {
   touch "$state/.last-watcher-beat"
   orca_case runtime-down-spawn
   printf '{"ok":true,"result":{"runtime":{"reachable":false,"state":"starting"}}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" FM_ORCA_STATUS_RESPONSE=sequence \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" FM_ORCA_STATUS_RESPONSE=sequence \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/fm-spawn.sh" "$id" "$proj" claude --mode no-mistakes --yolo off --backend orca 2>&1 )
@@ -597,7 +597,7 @@ test_spawn_refuses_orca_nonisolated_worktree() {
   printf '1\n' > "$RESP/1.exit"
   printf '{"ok":true,"result":{"repo":{"id":"repo-bad"}}}\n' > "$RESP/2.out"
   printf '{"ok":true,"result":{"worktree":{"id":"wt-bad","path":"%s"},"terminal":{"handle":"term-bad"}}}\n' "$proj" > "$RESP/3.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/fm-spawn.sh" "$id" "$proj" claude --mode no-mistakes --yolo off --backend orca 2>&1 )
@@ -632,7 +632,7 @@ test_spawn_removes_orca_worktree_when_terminal_create_fails() {
   printf '{"ok":true,"result":{"repo":{"id":"repo-terminal-fail"}}}\n' > "$RESP/2.out"
   printf '{"ok":true,"result":{"worktree":{"id":"wt-terminal-fail","path":"%s"}}}\n' "$wt" > "$RESP/3.out"
   printf '1\n' > "$RESP/4.exit"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/fm-spawn.sh" "$id" "$proj" claude --mode no-mistakes --yolo off --backend orca 2>&1 )
@@ -666,7 +666,7 @@ test_spawn_preserves_orca_metadata_when_abort_cleanup_fails() {
   printf '{"ok":true,"result":{"worktree":{"id":"wt-cleanup-fail","path":"%s"}}}\n' "$wt" > "$RESP/3.out"
   printf '1\n' > "$RESP/4.exit"
   printf '1\n' > "$RESP/5.exit"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/fm-spawn.sh" "$id" "$proj" claude --mode no-mistakes --yolo off --backend orca 2>&1 )
@@ -698,7 +698,7 @@ test_spawn_releases_orca_resources_when_metadata_write_fails() {
   printf '{"ok":true,"result":{"repo":{"id":"repo-meta-fail"}}}\n' > "$RESP/2.out"
   printf '{"ok":true,"result":{"worktree":{"id":"wt-meta-fail","path":"%s"}}}\n' "$wt" > "$RESP/3.out"
   printf '{"ok":true,"result":{"terminal":{"handle":"term-meta-fail"}}}\n' > "$RESP/4.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
     "$ROOT/bin/fm-spawn.sh" "$id" "$proj" claude --mode no-mistakes --yolo off --backend orca 2>&1 )
@@ -725,18 +725,18 @@ test_peek_send_and_crew_state_route_through_orca_meta() {
   orca_case io-path
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   printf '{"ok":true,"result":{"terminal":{"tail":["ready"]}}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_SEND_SETTLE=0 \
     "$ROOT/bin/fm-peek.sh" "fm-$id" 10 )
   [ "$out" = ready ] || fail "fm-peek should read through Orca metadata, got '$out'"
   printf '{"ok":true,"result":{"send":{"handle":"term-io","accepted":true}}}\n' > "$RESP/2.out"
   printf '{"ok":true,"result":{"send":{"handle":"term-io","accepted":true}}}\n' > "$RESP/3.out"
   printf '{"ok":true,"result":{"terminal":{"tail":["│ > │"]}}}\n' > "$RESP/4.out"
-  PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_HOME="$neutral" FM_STATE_OVERRIDE="$state" FM_SEND_SETTLE=0 \
     "$ROOT/bin/fm-send.sh" "fm-$id" "hello orca"
   printf '{"ok":true,"result":{"terminal":{"tail":["idle prompt"]}}}\n' > "$RESP/5.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-crew-state.sh" "$id" )
   assert_contains "$out" "state: unknown" "crew-state should fall back cleanly for an idle Orca scout"
   assert_contains "$(cat "$LOG")" $'orca\x1f''terminal'$'\x1f''read'$'\x1f''--terminal'$'\x1f''term-io' \
@@ -762,13 +762,13 @@ test_peek_and_crew_state_fail_closed_on_orca_error_json() {
   orca_case read-error-json
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   printf '{"ok":false,"error":{"code":"terminal_handle_stale","message":"terminal handle stale"}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-peek.sh" "fm-$id" 10 2>&1 )
   status=$?
   [ "$status" -ne 0 ] || fail "fm-peek should fail when Orca reports a stale terminal"
   assert_contains "$out" "terminal handle stale" "fm-peek should surface the Orca read error message"
   printf '{"ok":false,"error":{"code":"terminal_handle_stale","message":"terminal handle stale"}}\n' > "$RESP/2.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-crew-state.sh" "$id" )
   assert_contains "$out" "state: unknown" "crew-state should not treat an Orca read error as a live endpoint"
   assert_contains "$out" "backend target gone: term-stale" "crew-state should report the stale Orca terminal as gone"
@@ -782,7 +782,7 @@ test_target_exists_rejects_orca_error_json() {
   orca_case target-exists-error-json
   printf '{"ok":false,"error":{"code":"terminal_handle_stale","message":"terminal handle stale"}}\n' > "$RESP/1.out"
   set +e
-  PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/fm-backend.sh"; fm_backend_target_exists orca term-stale fm-task' "$ROOT"
   status=$?
   set -e
@@ -811,7 +811,7 @@ test_scout_teardown_removes_orca_worktree_via_helper() {
   printf '{"ok":true,"result":{"worktree":{"id":"wt-teardown","path":"%s"}}}\n' "$wt" > "$RESP/1.out"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
   rc=$?
@@ -848,7 +848,7 @@ test_scout_teardown_refuses_orca_id_path_mismatch() {
   printf '{"ok":true,"result":{"worktree":{"id":"wt-scout-mismatch","path":"%s"}}}\n' "$other_wt" > "$RESP/1.out"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
   rc=$?
@@ -883,7 +883,7 @@ test_teardown_removes_orca_worktree_when_path_missing() {
   orca_case missing-path
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
   rc=$?
@@ -918,7 +918,7 @@ test_teardown_preserves_metadata_when_orca_remove_error_json() {
   printf '{"ok":false,"error":{"code":"worktree_not_removed","message":"worktree not removed"}}\n' > "$RESP/2.out"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
   rc=$?
@@ -946,7 +946,7 @@ test_scout_teardown_refuses_orca_missing_report_when_path_missing() {
   orca_case missing-report
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
   rc=$?
@@ -976,7 +976,7 @@ test_ship_teardown_refuses_orca_missing_worktree_path() {
   orca_case missing-ship-path
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
   rc=$?
@@ -1008,7 +1008,7 @@ test_ship_teardown_removes_orca_worktree_when_id_path_matches() {
   printf '{"ok":true,"result":{"worktree":{"id":"wt-ship-match","path":"%s"}}}\n' "$wt" > "$RESP/1.out"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
   rc=$?
@@ -1043,7 +1043,7 @@ test_ship_teardown_refuses_orca_unresolvable_worktree_id() {
   printf '1\n' > "$RESP/1.exit"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
   rc=$?
@@ -1082,7 +1082,7 @@ test_ship_teardown_refuses_orca_id_path_mismatch() {
   printf '{"ok":true,"result":{"worktree":{"id":"wt-ship-mismatch","path":"%s"}}}\n' "$other_wt" > "$RESP/1.out"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
   rc=$?
@@ -1119,7 +1119,7 @@ test_teardown_refuses_orca_missing_worktree_id() {
   orca_case missing-id
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
   rc=$?
@@ -1151,7 +1151,7 @@ test_teardown_refuses_orca_worktree_without_terminal_handle() {
   orca_case no-terminal
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1 )
   rc=$?
@@ -1192,7 +1192,7 @@ test_secondmate_force_teardown_removes_orca_child_via_orca() {
   add_tmux_fake "$FB"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_HOME="$home" "$ROOT/bin/fm-teardown.sh" domain --force 2>&1 )
   rc=$?
   set -e
@@ -1235,7 +1235,7 @@ test_secondmate_force_teardown_refuses_orca_child_id_path_mismatch() {
   add_tmux_fake "$FB"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_HOME="$home" "$ROOT/bin/fm-teardown.sh" domain --force 2>&1 )
   rc=$?
   set -e
@@ -1275,7 +1275,7 @@ test_secondmate_force_teardown_refuses_partial_orca_child() {
   add_tmux_fake "$FB"
   neutral=$(neutral_fm_root "$CASE_DIR/neutral")
   set +e
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$neutral" FM_HOME="$home" "$ROOT/bin/fm-teardown.sh" domain --force 2>&1 )
   rc=$?
   set -e
@@ -1291,10 +1291,119 @@ test_dispatcher_sources_orca_and_routes_primitives() {
   local out
   orca_case dispatch
   printf '{"result":{"terminal":{"tail":["via dispatch"]}}}\n' > "$RESP/1.out"
-  out=$( PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     bash -c '. "$0/bin/fm-backend.sh"; fm_backend_validate orca; fm_backend_capture orca term-123 9' "$ROOT" )
   [ "$out" = "via dispatch" ] || fail "dispatcher should route capture to the Orca adapter, got '$out'"
   pass "fm-backend dispatcher: accepts orca and routes capture through bin/backends/orca.sh"
+}
+
+# --- fm_backend_orca_bin resolution order (docs/orca-backend.md; Orca's own
+# orca-cli skill): ORCA_CLI_COMMAND > orca-dev (ORCA_DEV_REPO_ROOT) > orca-ide
+# on Linux > orca elsewhere. Never falls back to a bare `orca` lookup on
+# Linux, since that name collides with the GNOME Orca screen reader.
+
+test_bin_resolution_prefers_orca_cli_command_override() {
+  local out
+  orca_case bin-resolution-override
+  ln -s orca "$FB/orca-ide"
+  ln -s orca "$FB/orca-dev"
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=my-orca-alias ORCA_DEV_REPO_ROOT="$TMP_ROOT/dev-repo" \
+    FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+    bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_bin' "$ROOT" )
+  [ "$out" = "my-orca-alias" ] || fail "ORCA_CLI_COMMAND should win over orca-dev/orca-ide/orca, got '$out'"
+  pass "fm_backend_orca_bin: ORCA_CLI_COMMAND overrides every other signal"
+}
+
+test_bin_resolution_prefers_orca_dev_when_repo_root_set() {
+  local out
+  orca_case bin-resolution-dev
+  ln -s orca "$FB/orca-ide"
+  ln -s orca "$FB/orca-dev"
+  out=$( PATH="$FB:$PATH" ORCA_DEV_REPO_ROOT="$TMP_ROOT/dev-repo" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+    bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_bin' "$ROOT" )
+  [ "$out" = "orca-dev" ] || fail "ORCA_DEV_REPO_ROOT should select orca-dev over orca-ide, got '$out'"
+  pass "fm_backend_orca_bin: ORCA_DEV_REPO_ROOT selects orca-dev over orca-ide/orca"
+}
+
+test_bin_resolution_uses_orca_ide_on_linux_never_bare_orca() {
+  local out
+  if [ "$(uname -s 2>/dev/null)" != Linux ]; then
+    pass "fm_backend_orca_bin: Linux orca-ide resolution (skipped - not running on Linux)"
+    return 0
+  fi
+  orca_case bin-resolution-linux
+  ln -s orca "$FB/orca-ide"
+  # orca_case already put a bare `orca` fake on PATH too (simulating the
+  # GNOME screen reader binary of the same name); resolution must still pick
+  # orca-ide, never the bare name. PATH is deliberately narrowed to $FB plus
+  # /usr/bin:/bin (for uname, needed by the resolver itself) rather than the
+  # ambient caller PATH, so this stays hermetic on a machine that happens to
+  # have a real orca-ide installed (as this development machine does).
+  out=$( PATH="$FB:/usr/bin:/bin" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+    bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_bin' "$ROOT" )
+  [ "$out" = "orca-ide" ] || fail "Linux resolution should select orca-ide over a bare orca on PATH, got '$out'"
+  pass "fm_backend_orca_bin: Linux resolution selects orca-ide, never falls back to bare orca"
+}
+
+test_bin_resolution_fails_closed_when_orca_ide_absent_on_linux() {
+  local out status
+  if [ "$(uname -s 2>/dev/null)" != Linux ]; then
+    pass "fm_backend_orca_tool_check: Linux orca-ide-absent guard (skipped - not running on Linux)"
+    return 0
+  fi
+  orca_case bin-resolution-linux-absent
+  set +e
+  # Narrowed PATH for the same hermeticity reason as the sibling resolution
+  # test above: this machine has a real orca-ide installed, and the point of
+  # this test is that its absence is what must be detected.
+  out=$( PATH="$FB:/usr/bin:/bin" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+    bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_tool_check' "$ROOT" 2>&1 )
+  status=$?
+  set -e
+  [ "$status" -ne 0 ] || fail "tool_check should fail closed on Linux when orca-ide is missing, even with a bare orca on PATH"
+  assert_contains "$out" "no Orca CLI executable was found" "tool_check did not explain the Linux resolution failure"
+  pass "fm_backend_orca_tool_check: fails closed on Linux without orca-ide, never falls back to bare orca"
+}
+
+# --- config/orca-lane-root (first non-empty line, mirroring fm_backend_name
+# and fm_backend_cmux_password): the --parent-worktree selector, passed
+# through verbatim.
+
+test_lane_root_reads_first_nonempty_config_line() {
+  local cfg out
+  orca_case lane-root-present
+  cfg="$CASE_DIR/config"
+  mkdir -p "$cfg"
+  printf '\n  folder:abc123  \nignored-second-line\n' > "$cfg/orca-lane-root"
+  out=$( FM_CONFIG_OVERRIDE="$cfg" bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_lane_root' "$ROOT" )
+  [ "$out" = "folder:abc123" ] || fail "lane_root should read the first non-empty config line, whitespace-stripped, got '$out'"
+  pass "fm_backend_orca_lane_root: reads and strips the first non-empty config line"
+}
+
+test_lane_root_absent_when_config_file_missing() {
+  local out
+  orca_case lane-root-absent
+  out=$( FM_CONFIG_OVERRIDE="$CASE_DIR/config" bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_lane_root' "$ROOT" )
+  [ -z "$out" ] || fail "lane_root should be empty when config/orca-lane-root is absent, got '$out'"
+  pass "fm_backend_orca_lane_root: empty when unconfigured"
+}
+
+test_worktree_create_uses_parent_worktree_when_lane_root_configured() {
+  local cfg out
+  orca_case lane-root-parent
+  cfg="$CASE_DIR/config"
+  mkdir -p "$cfg"
+  printf 'folder:lane-42\n' > "$cfg/orca-lane-root"
+  printf '1\n' > "$RESP/1.exit"
+  printf '{"ok":true,"result":{"repo":{"id":"repo-lane"}}}\n' > "$RESP/2.out"
+  printf '{"ok":true,"result":{"worktree":{"id":"wt-lane","path":"/tmp/orca-wt-lane"}}}\n' > "$RESP/3.out"
+  out=$( PATH="$FB:$PATH" ORCA_CLI_COMMAND=orca FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" FM_CONFIG_OVERRIDE="$cfg" \
+    bash -c '. "$0/bin/backends/orca.sh"; fm_backend_orca_worktree_create /repo/path fm-task' "$ROOT" )
+  assert_contains "$(cat "$LOG")" $'orca\x1f''worktree'$'\x1f''create'$'\x1f''--repo'$'\x1f''id:repo-lane'$'\x1f''--name'$'\x1f''fm-task'$'\x1f''--parent-worktree'$'\x1f''folder:lane-42'$'\x1f''--setup'$'\x1f''skip'$'\x1f''--json' \
+    "worktree helper should pass --parent-worktree with the configured lane root"
+  assert_not_contains "$(cat "$LOG")" $'--no-parent' \
+    "worktree helper should not pass --no-parent when a lane root is configured"
+  pass "fm_backend_orca_worktree_create: uses --parent-worktree when config/orca-lane-root is set"
 }
 
 test_capture_reads_terminal_tail_json
@@ -1320,6 +1429,13 @@ test_remove_worktree_refuses_empty_id
 test_remove_worktree_rejects_orca_error_json
 test_worktree_path_resolves_id
 test_dispatcher_sources_orca_and_routes_primitives
+test_bin_resolution_prefers_orca_cli_command_override
+test_bin_resolution_prefers_orca_dev_when_repo_root_set
+test_bin_resolution_uses_orca_ide_on_linux_never_bare_orca
+test_bin_resolution_fails_closed_when_orca_ide_absent_on_linux
+test_lane_root_reads_first_nonempty_config_line
+test_lane_root_absent_when_config_file_missing
+test_worktree_create_uses_parent_worktree_when_lane_root_configured
 test_json_get_ignores_undocumented_terminal_id_shapes
 test_worktree_and_terminal_helpers_parse_json
 test_worktree_create_removes_worktree_when_path_missing

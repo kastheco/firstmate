@@ -644,6 +644,23 @@ tests/fm-bootstrap.test.sh
 
 The fake-Orca suite covers readiness, registration, create response parsing, metadata routing, popup-safe submit, and path-matched release refusal.
 
+On 2026-08-19, `fm_backend_orca_bin` resolved `orca-ide` on Linux (bundle version 1.4.184), with no `orca` symlink present on `PATH`, confirming the CLI's own documented resolution order in real conditions rather than only against the fake-CLI suite above.
+
+```sh
+orca-ide status --json
+```
+
+Observed fields matched the macOS evidence above:
+
+```text
+result.runtime.reachable=true
+result.runtime.state=ready
+```
+
+This confirms the Linux app is installed, running, and ready, and that this adapter's real resolution order reaches it.
+It does not confirm the full spawn-through-teardown task lifecycle: no task has been spawned through Orca from a Linux home, so `worktree create`'s real response shape and the `--parent-worktree` lineage behavior remain verified only by the fake-Orca suite above, not by a live Linux spawn.
+Treat Linux support as CLI-and-readiness-verified but lifecycle-unproven until a live spawn is recorded here.
+
 ## cmux
 
 The current compatibility floor is cmux 0.64, and the active live evidence uses 0.64.17 build 97 on macOS aarch64.
