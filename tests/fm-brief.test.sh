@@ -217,6 +217,149 @@ test_ship_modes_generate_clean_briefs() {
   pass "fm-brief.sh: no-mistakes/direct-PR/local-only briefs generate cleanly"
 }
 
+# Local, gitignored config/brief-skill-chain is an absent-by-default opt-in
+# (docs/configuration.md). An unconfigured home - no config dir at all, or a
+# config dir with no brief-skill-chain file - must render byte-identical ship
+# briefs to today's behavior, proven by cmp rather than asserted.
+test_skill_chain_absent_config_is_byte_identical() {
+  local home id mode brief baseline
+  home="$TMP_ROOT/skill-chain-absent-home"
+  mkdir -p "$home/data"
+
+  for id_mode in "brief-skillabsent-a1:no-mistakes" "brief-skillabsent-a2:direct-PR" "brief-skillabsent-a3:local-only"; do
+    id=${id_mode%%:*}
+    mode=${id_mode##*:}
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" some-proj --mode "$mode" >/dev/null 2>&1
+    brief="$home/data/$id/brief.md"
+    assert_present "$brief" "$id: brief was not scaffolded"
+    assert_no_grep "# Local skill chain" "$brief" \
+      "$id: unconfigured home must not render a local skill chain section"
+  done
+
+  # No config dir at all vs. a config dir present with no brief-skill-chain
+  # file must render the same bytes for the same task id - both are "absent"
+  # for this feature.
+  baseline="$TMP_ROOT/skill-chain-absent-baseline.md"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-skillabsent-same some-proj --mode no-mistakes >/dev/null 2>&1
+  cp "$home/data/brief-skillabsent-same/brief.md" "$baseline"
+  rm -rf "$home/data/brief-skillabsent-same"
+
+  mkdir -p "$home/config"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-skillabsent-same some-proj --mode no-mistakes >/dev/null 2>&1
+  cmp -s "$baseline" "$home/data/brief-skillabsent-same/brief.md" \
+    || fail "an empty config dir must render byte-identical output to no config dir at all"
+  pass "fm-brief.sh: config/brief-skill-chain absent renders byte-identical ship briefs"
+}
+
+# Whitespace-only content follows config/crew-harness and config/backlog-backend's
+# convention of treating whitespace-only content as absent.
+test_skill_chain_whitespace_only_is_treated_as_absent() {
+  local home baseline
+  home="$TMP_ROOT/skill-chain-whitespace-home"
+  mkdir -p "$home/data"
+
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-x some-proj --mode no-mistakes >/dev/null 2>&1
+  baseline="$TMP_ROOT/skill-chain-whitespace-baseline.md"
+  cp "$home/data/brief-x/brief.md" "$baseline"
+  rm -rf "$home/data/brief-x"
+
+  mkdir -p "$home/config"
+  printf '   \n\n\t\n' > "$home/config/brief-skill-chain"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-x some-proj --mode no-mistakes >/dev/null 2>&1
+  cmp -s "$baseline" "$home/data/brief-x/brief.md" \
+    || fail "whitespace-only config/brief-skill-chain must render the same as an absent file"
+  pass "fm-brief.sh: whitespace-only config/brief-skill-chain is treated as absent"
+}
+
+# Present, non-blank content is injected verbatim between {TASK} and the Herdr
+# declaration - read before Setup, without disturbing the existing safety
+# sections (Herdr declaration, Rules, Definition of done).
+test_skill_chain_present_content_is_injected_verbatim() {
+  local home brief
+  home="$TMP_ROOT/skill-chain-present-home"
+  mkdir -p "$home/data" "$home/config"
+  printf '/implement\nThen run /tdd for the core change.\n' > "$home/config/brief-skill-chain"
+
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-x some-proj --mode no-mistakes >/dev/null 2>&1
+  brief="$home/data/brief-x/brief.md"
+  assert_present "$brief" "brief was not scaffolded"
+  assert_grep "# Local skill chain" "$brief" "present config/brief-skill-chain must render its section header"
+  assert_grep "/implement" "$brief" "present config/brief-skill-chain content must appear verbatim"
+  assert_grep "Then run /tdd for the core change." "$brief" "present config/brief-skill-chain content must appear verbatim"
+  assert_no_grep "EOF" "$brief" "config/brief-skill-chain injection leaked a heredoc EOF marker"
+
+  # Position: the section must land after {TASK} and before the Herdr
+  # declaration, and must not disturb Rules or Definition of done.
+  awk '
+    /^\{TASK\}$/ { task = NR }
+    /^# Local skill chain$/ { chain = NR }
+    /^# Herdr lifecycle declaration/ { herdr = NR }
+    /^# Rules$/ { rules = NR }
+    /^# Definition of done$/ { dod = NR }
+    END {
+      if (!(task && chain && herdr && task < chain && chain < herdr)) {
+        print "order violated: task=" task " chain=" chain " herdr=" herdr; exit 1
+      }
+      if (!(rules && dod && herdr < rules && rules < dod)) {
+        print "safety sections displaced: herdr=" herdr " rules=" rules " dod=" dod; exit 1
+      }
+    }
+  ' "$brief" || fail "config/brief-skill-chain section must sit between {TASK} and the Herdr declaration, leaving Rules/Definition of done untouched"
+  pass "fm-brief.sh: present config/brief-skill-chain content is injected verbatim in the right position"
+}
+
+# The injected section is free text with no parsing or schema: arbitrary
+# content, including characters that could be mistaken for shell structure,
+# must render inert rather than executing or corrupting the brief.
+test_skill_chain_content_is_not_interpreted() {
+  local home brief
+  home="$TMP_ROOT/skill-chain-injection-home"
+  mkdir -p "$home/data" "$home/config"
+  # shellcheck disable=SC2016 # Literal shell-lookalike fixture content must remain unexpanded.
+  printf '`touch %s/PWNED` and $(touch %s/PWNED2) and $SOME_VAR\n' "$home" "$home" > "$home/config/brief-skill-chain"
+
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-x some-proj --mode no-mistakes >/dev/null 2>&1
+  brief="$home/data/brief-x/brief.md"
+  assert_present "$brief" "brief was not scaffolded"
+  assert_grep '`touch' "$brief" "backtick content must render literally, not execute"
+  assert_absent "$home/PWNED" "config/brief-skill-chain content must never execute as shell"
+  assert_absent "$home/PWNED2" "config/brief-skill-chain content must never execute as shell"
+  pass "fm-brief.sh: config/brief-skill-chain content is injected as inert text, never interpreted"
+}
+
+# The feature is documented as ship-only: scout and secondmate scaffolds must
+# never carry the section, even when the file is present and non-blank.
+test_skill_chain_never_applies_to_scout_or_secondmate() {
+  local home brief
+  home="$TMP_ROOT/skill-chain-scout-secondmate-home"
+  mkdir -p "$home/data" "$home/config"
+  printf '/implement\n' > "$home/config/brief-skill-chain"
+
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-scout-x some-proj --scout >/dev/null 2>&1
+  brief="$home/data/brief-scout-x/brief.md"
+  assert_present "$brief" "scout brief was not scaffolded"
+  assert_no_grep "# Local skill chain" "$brief" "scout briefs must never carry the local skill chain section"
+
+  FM_SECONDMATE_CHARTER=x FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-sm-x --secondmate --no-projects >/dev/null 2>&1
+  brief="$home/data/brief-sm-x/brief.md"
+  assert_present "$brief" "secondmate charter was not scaffolded"
+  assert_no_grep "# Local skill chain" "$brief" "secondmate charters must never carry the local skill chain section"
+  pass "fm-brief.sh: config/brief-skill-chain never applies to scout or secondmate scaffolds"
+}
+
+# config/brief-skill-chain must propagate to secondmate homes under the same
+# mechanism as config/crew-harness and config/backlog-backend (mirrors the
+# membership assertion in tests/fm-trace-context-lib.test.sh).
+test_skill_chain_is_inheritable_config() {
+  # shellcheck source=/dev/null
+  . "$ROOT/bin/fm-config-inherit-lib.sh"
+  case " $FM_INHERITABLE_CONFIG " in
+    *" brief-skill-chain "*) : ;;
+    *) fail "config/brief-skill-chain must be in FM_INHERITABLE_CONFIG so secondmate homes inherit it" ;;
+  esac
+  pass "fm-brief.sh: config/brief-skill-chain is inherited into secondmate homes"
+}
+
 # A ship task's delivery mode is firstmate's per-task decision, so a missing or
 # unusable value must stop the scaffold instead of silently defaulting. The
 # no-mistakes-prod-only row is the conditional registry policy: it is never a task
@@ -716,6 +859,12 @@ test_script_parses
 test_no_heredoc_in_command_substitution
 test_help_includes_entire_header
 test_ship_modes_generate_clean_briefs
+test_skill_chain_absent_config_is_byte_identical
+test_skill_chain_whitespace_only_is_treated_as_absent
+test_skill_chain_present_content_is_injected_verbatim
+test_skill_chain_content_is_not_interpreted
+test_skill_chain_never_applies_to_scout_or_secondmate
+test_skill_chain_is_inheritable_config
 test_ship_mode_is_required_and_closed_set
 test_ship_mode_is_explicit_not_registry
 test_delivery_flags_are_refused_where_they_do_not_apply

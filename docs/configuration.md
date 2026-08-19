@@ -163,6 +163,15 @@ An inherited `data/captain-shared.md` counts in a secondmate's total but remains
 The internal [`/stow` skill](../.agents/skills/stow/SKILL.md) owns curation and its automatic secondmate cascade, which accounts every home against this same per-home allowance separately rather than against a fleet total.
 The helper's header owns exact parsing, publication, and report output mechanics.
 
+## Local skill chain for generated ship briefs (config/brief-skill-chain)
+
+`config/brief-skill-chain` is a local, gitignored, absent-by-default opt-in for a home whose contributor has local skills that this shared template repo cannot assume every fleet member has installed, such as a personal `/implement` workflow.
+When the file exists and holds non-blank content, `bin/fm-brief.sh` injects that content verbatim into every generated ship brief (all delivery modes) in a "# Local skill chain" section between the task description and the Herdr lifecycle declaration, so a worker reads it before Setup.
+Absent, or present but whitespace-only, renders no such section and leaves the generated brief byte-identical to an unconfigured home's output, following the same treat-whitespace-as-absent convention as `config/crew-harness` and `config/backlog-backend`.
+The file is free text with no parsing, schema, or fixed skill name: `fm-brief.sh` never hardcodes what it contains, so the content can name any local skill chain a home's crewmates should follow before implementation work, such as `/implement` routing through `/tdd`.
+Scout and secondmate scaffolds never carry this section; it applies to ship briefs only.
+`config/brief-skill-chain` is inherited into secondmate homes under the primary-authoritative contract owned by [`secondmate-provisioning`](../.agents/skills/secondmate-provisioning/SKILL.md).
+
 ## Secondmate routes (data/secondmates.md)
 
 Persistent secondmate routes live locally in `data/secondmates.md`.

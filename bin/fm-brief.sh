@@ -54,6 +54,12 @@
 # it carries the AGENTS.md authoring bar (widely useful knowledge only, pointers
 # over copied detail) and has the crewmate add the fm-ensure-agents-md.sh
 # self-governance section when a touched project AGENTS.md lacks it.
+# When local, gitignored config/brief-skill-chain holds non-blank content, every
+# generated ship brief (every mode) carries it verbatim in a "# Local skill
+# chain" section between the Task and the Herdr declaration, read before Setup.
+# Absent or whitespace-only content renders no such section, so an unconfigured
+# home's briefs are unaffected. The file is free text with no parsing or schema;
+# fm-brief.sh never hardcodes a skill name.
 # Refuses to overwrite an existing brief.
 set -eu
 
@@ -101,6 +107,7 @@ if [ -n "${FM_STATE_OVERRIDE:-}" ]; then
 else
   STATE="$FM_HOME/state"
 fi
+CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 KIND=ship
 HERDR_LAB=0
 NO_PROJECTS=0
@@ -410,13 +417,31 @@ esac
 # briefs stay byte-identical to the historical Bash 5 output.
 DOD=${DOD%$'\n'}
 
+# Local, gitignored config/brief-skill-chain is an optional per-home opt-in: its
+# free-text content (no schema, no fixed skill name) is injected into every
+# generated ship brief. Mirrors config/crew-harness and config/backlog-backend's
+# convention of treating whitespace-only content as absent. SKILL_CHAIN_SECTION
+# defaults to just the blank line the heredoc below already relied on between
+# {TASK} and $HERDR_SECTION, so an unconfigured home's briefs stay byte-identical.
+# Built with $'...'/"$VAR" concatenation rather than $(...), which would strip
+# the deliberate trailing blank line, and rather than a heredoc, which risks
+# delimiter collision against arbitrary file content.
+SKILL_CHAIN_SECTION=$'\n'
+SKILL_CHAIN_FILE="$CONFIG/brief-skill-chain"
+if [ -f "$SKILL_CHAIN_FILE" ]; then
+  SKILL_CHAIN_CONTENT=$(cat "$SKILL_CHAIN_FILE" 2>/dev/null || true)
+  SKILL_CHAIN_TRIMMED=$(printf '%s' "$SKILL_CHAIN_CONTENT" | tr -d '[:space:]')
+  if [ -n "$SKILL_CHAIN_TRIMMED" ]; then
+    SKILL_CHAIN_SECTION=$'\n# Local skill chain\nThis home'"'"$'s local `config/brief-skill-chain` requires ship tasks to run this instruction chain before starting implementation work:\n\n'"$SKILL_CHAIN_CONTENT"$'\n\n'
+  fi
+fi
+
 cat > "$BRIEF" <<EOF
 You are a crewmate: an autonomous worker agent managed by firstmate. Work on your own; do not wait for a human.
 
 # Task
 {TASK}
-
-$HERDR_SECTION
+${SKILL_CHAIN_SECTION}$HERDR_SECTION
 
 # Setup
 You are in a disposable git worktree of $REPO, at a detached HEAD on a clean default branch.
