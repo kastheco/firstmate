@@ -148,6 +148,7 @@ Herdr's Claude idle-native submit confirmation is pinned by `tests/fm-backend-he
 ### Cleanup endpoint identity
 
 The cleanup identity boundary was validated on 2026-07-28 with tmux 3.6a and metadata fixtures for every supported backend.
+The Orca worktree id assertion below was added and run on 2026-08-19, when the Orca fixture's fabricated worktree id was replaced with the composite `<repoId>::<worktreePath>` form Orca actually returns; [`orca-backend.md`](../orca-backend.md#task-shape-and-metadata) owns that field's validation contract.
 
 ```sh
 tests/fm-teardown-endpoint-safety.test.sh
@@ -163,6 +164,7 @@ Bounded output from the incident regression:
 ```text
 ok - fm-teardown: missing, empty, malformed, ambiguous, and task-mismatched endpoints refuse before every mutation or runtime call
 ok - cleanup identity: valid tmux, Herdr, Zellij, Orca, and cmux records validate while every empty backend target refuses
+ok - Orca worktree id: accepts Orca's composite and plain forms plus paths with spaces, parentheses, and non-ASCII, refuses traversal, relative, malformed, and control-character values
 ok - tmux backend: direct empty target returns nonzero without invoking tmux
 ok - process cleanup: creation-time PID identity removes only the exact child and preserves the control child
 ok - fm-teardown: dedicated-socket invalid cleanup preserves target/control and valid cleanup removes only the exact target

@@ -385,11 +385,11 @@ fm_backend_endpoint_atom_valid() {  # <value>
 
 # fm_backend_orca_worktree_id_valid: Orca's worktree id is structured, not
 # opaque. `orca worktree create --json` returns `<repoId>::<worktreePath>`, and
-# Orca's own selectors accept that same form (see the --parent-worktree note in
-# bin/backends/orca.sh). The atom charset above deliberately excludes `:` and
-# `/` because every other endpoint field it guards is an opaque handle, so this
-# one field gets its own check instead of widening a rule the other backends
-# would inherit. Each half is validated for what it actually is: the repo id
+# Orca's own selectors accept that same form: bin/backends/orca.sh passes the
+# recorded id straight back as `--worktree "id:$worktree_id"`. The atom charset
+# above deliberately excludes `:` and `/` because every other endpoint field it
+# guards is an opaque handle, so this one field gets its own check instead of
+# widening a rule the other backends would inherit. Each half is validated for what it actually is: the repo id
 # against the opaque atom rule unchanged, and the path half as an absolute path
 # with no `..` traversal segment and no control characters. The path half gets
 # no charset allowlist because the value is argv-safe at every use site - it
