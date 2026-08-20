@@ -391,7 +391,16 @@ fm_backend_endpoint_atom_valid() {  # <value>
 # one field gets its own check instead of widening a rule the other backends
 # would inherit. Each half is validated for what it actually is: the repo id
 # against the opaque atom rule unchanged, and the path half as an absolute path
-# with no whitespace and no `..` traversal segment. A value with no `::` is
+# with no `..` traversal segment and no control characters. The path half gets
+# no charset allowlist because the value is argv-safe at every use site - it
+# expands quoted into `orca worktree rm --worktree "id:$id"` and reaches the CLI
+# through `"$@"` in fm_backend_orca_run_json, never through eval - and teardown
+# re-resolves the id through Orca and binds it with require_orca_worktree_path_match
+# before removing anything. So the remaining checks are a meta-file format
+# tripwire, not a shell-injection guard: control characters stay refused because
+# a newline or similar would corrupt the one-value-per-line meta format, and
+# legitimate worktree paths containing spaces, parentheses, or non-ASCII
+# characters must validate rather than strand the task. A value with no `::` is
 # still accepted through the atom rule, so records written before Orca returned
 # the composite form keep validating.
 fm_backend_orca_worktree_id_valid() {  # <value>
@@ -408,7 +417,7 @@ fm_backend_orca_worktree_id_valid() {  # <value>
     *) return 1 ;;
   esac
   case "$path" in
-    *[!A-Za-z0-9._@%+/-]*) return 1 ;;
+    *[[:cntrl:]]*) return 1 ;;
   esac
   case "$path" in
     */../*|*/..) return 1 ;;
