@@ -46,12 +46,16 @@ The normal isolation and unlanded-work refusal rules still apply.
 backend=orca
 window=fm-<id>
 terminal=<orca terminal handle>
-orca_worktree_id=<orca worktree id>
+orca_worktree_id=<orca repo id>::<absolute Orca worktree path>
 worktree=<absolute Orca worktree path>
 ```
 
 `window=` remains the caller-facing Firstmate alias.
 `terminal=` and `orca_worktree_id=` are the backend authority used by operation and cleanup paths.
+
+`orca_worktree_id=` is structured, not opaque: `orca worktree create --json` returns `<repoId>::<worktreePath>` and Orca's own selectors take that same composite form back.
+Cleanup validation therefore checks each half for what it is - the repo id as an opaque handle, the path half as an absolute path with no `..` traversal segment and no control characters - instead of applying the opaque-handle charset used for `terminal=` and every other backend's endpoint fields.
+Legitimate worktree paths containing spaces, parentheses, or non-ASCII characters validate; a value with no `::` still validates as a plain opaque id, so records written before Orca returned the composite form are not stranded.
 
 ## Current lifecycle and safety
 
@@ -90,6 +94,9 @@ It never raw-deletes an Orca worktree.
 tests/fm-backend-orca.test.sh
 tests/fm-backend.test.sh
 tests/fm-bootstrap.test.sh
+tests/fm-teardown-endpoint-safety.test.sh
 ```
+
+`tests/fm-teardown-endpoint-safety.test.sh` pins the recorded `orca_worktree_id=` contract above: both accepted forms and the refused traversal, relative-path, malformed, and control-character values.
 
 [`verification/runtime-backends.md`](verification/runtime-backends.md#orca) records the real readiness and response-shape smoke.

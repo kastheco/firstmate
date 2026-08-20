@@ -223,7 +223,8 @@ test_supported_backend_endpoint_records_validate() {
   id=orca-task
   fm_write_meta "$dir/home/state/$id.meta" \
     "window=fm-$id" "endpoint_task_id=$id" "terminal=term-7" \
-    "worktree=$dir/worktree" "project=$dir/project" "backend=orca" "orca_worktree_id=worktree-9"
+    "worktree=$dir/worktree" "project=$dir/project" "backend=orca" \
+    "orca_worktree_id=1cf44768-d09b-4428-81a2-bb7564295578::/home/captain/dev/demo/.worktrees/demo/fm-$id"
   fm_backend_validate_task_endpoint "$dir/home/state/$id.meta" "$id" || fail "valid Orca endpoint refused"
   [ "$FM_BACKEND_VALIDATED_TARGET" = term-7 ] || fail "Orca validation did not select its terminal"
 
@@ -241,6 +242,112 @@ test_supported_backend_endpoint_records_validate() {
     [ "$target" -ne 0 ] || fail "$backend generic kill accepted an empty target"
   done
   pass "cleanup identity: valid tmux, Herdr, Zellij, Orca, and cmux records validate while every empty backend target refuses"
+}
+
+test_orca_worktree_id_accepts_orca_format_and_rejects_unsafe_values() {
+  local dir id rc bad good n
+  dir=$(make_case orca-worktree-id)
+  # shellcheck source=/dev/null
+  . "$ROOT/bin/fm-backend.sh"
+
+  # Orca returns `<repoId>::<worktreePath>`. Validation must accept that form,
+  # because refusing it strands every Orca task: teardown declines to act on a
+  # record it cannot vouch for, and the worktree can never be cleaned up.
+  id=orca-composite
+  fm_write_meta "$dir/home/state/$id.meta" \
+    "window=fm-$id" "endpoint_task_id=$id" "terminal=term_d2c8915a-0b8a-4564" \
+    "worktree=$dir/worktree" "project=$dir/project" "backend=orca" \
+    "orca_worktree_id=1cf44768-d09b-4428-81a2-bb7564295578::/home/captain/dev/demo/.worktrees/demo/fm-$id"
+  fm_backend_validate_task_endpoint "$dir/home/state/$id.meta" "$id" \
+    || fail "Orca endpoint with a real composite worktree id refused"
+  [ "$FM_BACKEND_VALIDATED_TARGET" = term_d2c8915a-0b8a-4564 ] \
+    || fail "Orca validation did not select its terminal for a composite worktree id"
+
+  # A plain id keeps validating, so records written before Orca returned the
+  # composite form are not stranded by the widened rule.
+  id=orca-plain
+  fm_write_meta "$dir/home/state/$id.meta" \
+    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-7" \
+    "worktree=$dir/worktree" "project=$dir/project" "backend=orca" "orca_worktree_id=worktree-9"
+  fm_backend_validate_task_endpoint "$dir/home/state/$id.meta" "$id" \
+    || fail "Orca endpoint with a plain worktree id refused"
+
+  # Real worktree paths contain spaces, parentheses, and non-ASCII characters.
+  # The path half carries no charset allowlist, so these must validate: refusing
+  # them strands exactly the tasks this fix exists to clean up.
+  n=0
+  for good in \
+    '1cf44768::/home/captain/dev/my demo/.worktrees/demo/fm-x' \
+    '1cf44768::/home/captain/dev/demo (old)/.worktrees/demo/fm-x' \
+    '1cf44768::/home/captain/dev/démo/.worktrees/demo/fm-x'
+  do
+    n=$((n + 1))
+    id="orca-ok-$n"
+    fm_write_meta "$dir/home/state/$id.meta" \
+      "window=fm-$id" "endpoint_task_id=$id" "terminal=term-7" \
+      "worktree=$dir/worktree" "project=$dir/project" "backend=orca" \
+      "orca_worktree_id=$good"
+    fm_backend_validate_task_endpoint "$dir/home/state/$id.meta" "$id" \
+      || fail "Orca validation refused a legitimate worktree path: $good"
+  done
+
+  # The composite form must not become a hole. Each of these is refused for a
+  # different reason: a traversal segment, a trailing `..`, a relative path
+  # half, an empty repo half, a repo half that is not an opaque atom, and a repo
+  # half carrying a shell metacharacter payload.
+  # shellcheck disable=SC2016  # Single quotes are deliberate: the literal $(...) is the payload under test.
+  for bad in \
+    '1cf44768::/home/captain/../../etc/fm-x' \
+    '1cf44768::/home/captain/dev/..' \
+    '1cf44768::relative/path/fm-x' \
+    '::/home/captain/dev/demo/fm-x' \
+    'repo/id::/home/captain/dev/demo/fm-x' \
+    '1cf44768$(touch /tmp/fm-pwn)::/home/captain/dev/demo/fm-x'
+  do
+    id=orca-bad
+    fm_write_meta "$dir/home/state/$id.meta" \
+      "window=fm-$id" "endpoint_task_id=$id" "terminal=term-7" \
+      "worktree=$dir/worktree" "project=$dir/project" "backend=orca" \
+      "orca_worktree_id=$bad"
+    set +e
+    fm_backend_validate_task_endpoint "$dir/home/state/$id.meta" "$id" >/dev/null 2>&1
+    rc=$?
+    set -e
+    [ "$rc" -ne 0 ] || fail "Orca validation accepted an unsafe worktree id: $bad"
+  done
+
+  # Control characters would corrupt the one-value-per-line meta format, so the
+  # validator refuses them. These reach the validator directly: routed through a
+  # meta file a newline is simply split across two lines and never reaches this
+  # check.
+  for bad in \
+    "1cf44768::/home/captain/dev/demo/fm-x"$'\n'"window=fm-orca-bad" \
+    "1cf44768::/home/captain/dev/demo/fm-x"$'\t'"tail" \
+    "1cf44768::/home/captain/dev/demo/fm-x"$'\r'
+  do
+    set +e
+    fm_backend_orca_worktree_id_valid "$bad"
+    rc=$?
+    set -e
+    [ "$rc" -ne 0 ] || fail "Orca worktree id validator accepted a control character"
+  done
+
+  # A newline in the recorded value writes two lines into the meta file, so such
+  # a record is refused upstream by the duplicate-`window` check rather than by
+  # the worktree id validator. Pin that refusal too: it is what actually keeps a
+  # smuggled second endpoint field out of a real teardown.
+  id=orca-bad
+  fm_write_meta "$dir/home/state/$id.meta" \
+    "window=fm-$id" "endpoint_task_id=$id" "terminal=term-7" \
+    "worktree=$dir/worktree" "project=$dir/project" "backend=orca" \
+    "orca_worktree_id=1cf44768::/home/captain/dev/demo/fm-x"$'\n'"window=fm-orca-bad"
+  set +e
+  fm_backend_validate_task_endpoint "$dir/home/state/$id.meta" "$id" >/dev/null 2>&1
+  rc=$?
+  set -e
+  [ "$rc" -ne 0 ] || fail "Orca validation accepted a record smuggling a second window field"
+
+  pass "Orca worktree id: accepts Orca's composite and plain forms plus paths with spaces, parentheses, and non-ASCII, refuses traversal, relative, malformed, and control-character values"
 }
 
 test_tmux_empty_target_refuses_without_invocation() {
@@ -369,6 +476,7 @@ test_invalid_endpoint_records_refuse_before_mutation
 test_control_lock_contention_refuses_before_mutation
 test_metadata_lock_serializes_destructive_cleanup
 test_supported_backend_endpoint_records_validate
+test_orca_worktree_id_accepts_orca_format_and_rejects_unsafe_values
 test_tmux_empty_target_refuses_without_invocation
 test_recorded_process_identity_cleanup_is_exact
 test_isolated_tmux_invalid_and_valid_cleanup
